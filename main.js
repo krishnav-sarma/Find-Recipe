@@ -5,8 +5,10 @@ const LOOKUP_API_URL = "https://www.themealdb.com/api/json/v1/1/lookup.php?i=";
 const searchForm = document.getElementById("search-form");
 const searchInput = document.getElementById("search-input");
 const resultsGrid = document.getElementById("results-grid");
+const favoritesGrid = document.getElementById("favorites-grid");
 const messageArea = document.getElementById("message-area");
 const randomButton = document.getElementById("random-button");
+const favoritesButton = document.getElementById("favorites-button");
 const modal = document.getElementById("recipe-modal");
 const modalContent = document.getElementById("recipe-details-content");
 const modalCloseBtn = document.getElementById("modal-close-btn");
@@ -25,6 +27,9 @@ searchForm.addEventListener("submit", (e) => {
 async function searchRecipes(query) {
   showMessage(`Searching for "${query}"...`, false, true);
   resultsGrid.innerHTML = "";
+  favoritesGrid.classList.add("hidden");
+  resultsGrid.classList.remove("hidden");
+  favoritesButton.textContent = "My Favorites";
 
   try {
     const response = await fetch(`${SEARCH_API_URL}${query}`);
@@ -37,7 +42,7 @@ async function searchRecipes(query) {
     if (data.meals) {
       displayRecipes(data.meals);
     } else {
-      showMessage(`No recipes found for "${query}",`);
+      showMessage(`No recipes found for "${query}"`);
     }
   } catch (error) {
     showMessage("Something went wrong, Please try again.", true);
@@ -46,6 +51,7 @@ async function searchRecipes(query) {
 
 function showMessage(message, isError = false, isLoading = false) {
   messageArea.textContent = message;
+  messageArea.className = "message";
   if (isError) messageArea.classList.add("error");
   if (isLoading) messageArea.classList.add("loading");
 }
@@ -61,17 +67,39 @@ function displayRecipes(recipes) {
     return;
   }
 
+  const favorites = JSON.parse(localStorage.getItem("recipeFavorites")) || {};
+  const userFavorites = favorites["defaultUser"] || [];
+
+  resultsGrid.innerHTML = "";
+
   recipes.forEach((recipe) => {
     const recipeDiv = document.createElement("div");
     recipeDiv.classList.add("recipe-item");
     recipeDiv.dataset.id = recipe.idMeal;
 
+    const isFavorite = userFavorites.some(fav => fav.idMeal === recipe.idMeal);
+
     recipeDiv.innerHTML = `
-        <img src="${recipe.strMealThumb}" alt="${recipe.strMeal}" loading="lazy">
-        <h3>${recipe.strMeal}</h3>
+      <button class="favorite-star ${isFavorite ? 'active' : ''}">★</button>
+      <img src="${recipe.strMealThumb}" alt="${recipe.strMeal}" loading="lazy">
+      <h3>${recipe.strMeal}</h3>
     `;
 
     resultsGrid.appendChild(recipeDiv);
+  });
+
+  // Add event listeners to the stars
+  document.querySelectorAll(".favorite-star").forEach(star => {
+    star.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const recipeItem = e.target.closest(".recipe-item");
+      const recipeId = recipeItem.dataset.id;
+      const recipe = recipes.find(r => r.idMeal === recipeId);
+      
+      const wasAdded = manageFavorites(recipeId, recipe);
+      e.target.classList.toggle("active", wasAdded);
+      showFavoriteNotification(wasAdded ? "Added to favorites!" : "Removed from favorites");
+    });
   });
 }
 
@@ -80,6 +108,9 @@ randomButton.addEventListener("click", getRandomRecipe);
 async function getRandomRecipe() {
   showMessage("Fetching a random recipe...", false, true);
   resultsGrid.innerHTML = "";
+  favoritesGrid.classList.add("hidden");
+  resultsGrid.classList.remove("hidden");
+  favoritesButton.textContent = "My Favorites";
 
   try {
     const response = await fetch(RANDOM_API_URL);
@@ -101,6 +132,109 @@ async function getRandomRecipe() {
   }
 }
 
+favoritesButton.addEventListener("click", toggleFavoritesView);
+
+function toggleFavoritesView() {
+  resultsGrid.classList.toggle("hidden");
+  favoritesGrid.classList.toggle("hidden");
+  
+  if (!favoritesGrid.classList.contains("hidden")) {
+    displayFavorites();
+    favoritesButton.textContent = "Back to Results";
+  } else {
+    favoritesButton.textContent = "My Favorites";
+  }
+}
+
+function manageFavorites(recipeId, recipeData = null) {
+  let favorites = JSON.parse(localStorage.getItem("recipeFavorites")) || {};
+  const userId = "defaultUser"; // In a real app, you'd have user authentication
+
+  if (!favorites[userId]) {
+    favorites[userId] = [];
+  }
+
+  const userFavorites = favorites[userId];
+  const index = userFavorites.findIndex(fav => fav.idMeal === recipeId);
+
+  if (index === -1) {
+    // Add to favorites
+    if (recipeData) {
+      userFavorites.push(recipeData);
+    }
+  } else {
+    // Remove from favorites
+    userFavorites.splice(index, 1);
+  }
+
+  localStorage.setItem("recipeFavorites", JSON.stringify(favorites));
+  return index === -1; // Returns true if added, false if removed
+}
+
+function displayFavorites() {
+  const favorites = JSON.parse(localStorage.getItem("recipeFavorites")) || {};
+  const userFavorites = favorites["defaultUser"] || [];
+  
+  favoritesGrid.innerHTML = "";
+
+  if (userFavorites.length === 0) {
+    favoritesGrid.innerHTML = '<p class="message">You have no favorite recipes yet!</p>';
+    return;
+  }
+
+  userFavorites.forEach((recipe) => {
+    const recipeDiv = document.createElement("div");
+    recipeDiv.classList.add("recipe-item");
+    recipeDiv.dataset.id = recipe.idMeal;
+
+    recipeDiv.innerHTML = `
+      <button class="favorite-star active">★</button>
+      <img src="${recipe.strMealThumb}" alt="${recipe.strMeal}" loading="lazy">
+      <h3>${recipe.strMeal}</h3>
+    `;
+
+    favoritesGrid.appendChild(recipeDiv);
+  });
+
+  // Add event listeners to the stars in favorites view
+  document.querySelectorAll("#favorites-grid .favorite-star").forEach(star => {
+    star.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const recipeItem = e.target.closest(".recipe-item");
+      const recipeId = recipeItem.dataset.id;
+      
+      manageFavorites(recipeId);
+      recipeItem.remove();
+      showFavoriteNotification("Removed from favorites");
+      
+      if (favoritesGrid.children.length === 0) {
+        favoritesGrid.innerHTML = '<p class="message">You have no favorite recipes yet!</p>';
+      }
+    });
+  });
+
+  // Add click handler for recipe items in favorites
+  favoritesGrid.addEventListener("click", (e) => {
+    const card = e.target.closest(".recipe-item");
+    if (card && !e.target.classList.contains("favorite-star")) {
+      const recipeId = card.dataset.id;
+      getRecipeDetails(recipeId);
+    }
+  });
+}
+
+function showFavoriteNotification(message) {
+  const notification = document.createElement("div");
+  notification.className = "favorite-notification";
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.classList.add("fade-out");
+    setTimeout(() => notification.remove(), 500);
+  }, 2000);
+}
+
 function showModal() {
   modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -113,8 +247,7 @@ function closeModal() {
 
 resultsGrid.addEventListener("click", (e) => {
   const card = e.target.closest(".recipe-item");
-
-  if (card) {
+  if (card && !e.target.classList.contains("favorite-star")) {
     const recipeId = card.dataset.id;
     getRecipeDetails(recipeId);
   }
@@ -184,7 +317,9 @@ function displayRecipeDetails(recipe) {
     : "";
 
   modalContent.innerHTML = `
-  <h2>${recipe.strMeal}</h2>
+  <div class="recipe-header">
+    <h2>${recipe.strMeal}</h2>
+  </div>
   <img src="${recipe.strMealThumb}" alt="${recipe.strMeal}">
   ${categoryHTML}
   ${areaHTML}
@@ -194,3 +329,10 @@ function displayRecipeDetails(recipe) {
   ${sourcHTML}
   `;
 }
+
+  // Add event listener for the modal favorite button
+  document.getElementById("modal-favorite-btn").addEventListener("click", (e) => {
+    const wasAdded = manageFavorites(recipe.idMeal, recipe);
+    e.target.classList.toggle("active", wasAdded);
+    showFavoriteNotification(wasAdded ? "Added to favorites!" : "Removed from favorites");
+  });

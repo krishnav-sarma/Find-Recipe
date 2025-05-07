@@ -31,10 +31,17 @@
         <button type="submit" id="search-button">Search</button>
       </form>
 
-      <div class="random-button-container">
-        <button id="random-button" class="random-button">
-          Get Random Recipe
-        </button>
+      <div class="random-favorites-container">
+        <div class="random-button-container">
+          <button id="random-button" class="random-button">
+            Get Random Recipe
+          </button>
+        </div>
+        <div class="favorites-button-container">
+          <button id="favorites-button" class="favorites-button">
+            My Favorites
+          </button>
+        </div>
       </div>
 
       <div class="message" id="message-area">
@@ -42,6 +49,7 @@
       </div>
 
       <div class="results-grid" id="results-grid"></div>
+      <div class="favorites-grid hidden" id="favorites-grid"></div>
     </div>
 
     <div class="modal-container hidden" id="recipe-modal">
