@@ -2,7 +2,7 @@
 
 A web application that allows users to search for recipes by name or get random recipes from TheMealDB API.
 
-![Recipe Finder Screenshot](./assects/webpage.png)
+![Recipe Finder Screenshot](./assects/page.png)
 
 ## Features
 
