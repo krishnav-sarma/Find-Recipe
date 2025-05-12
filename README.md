@@ -43,4 +43,4 @@ Alternatively, you can host it on any web server:
 4. Click on any recipe to view detailed information
 5. Use the "Get Random Recipe" button for inspiration
 
-## File Structure
+
